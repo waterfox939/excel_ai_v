@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+  <title>Excel AI Agent</title>
+  <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="taskpane.css" />
+</head>
+<body>
+  <div id="selection-bar">
+    <span id="selection-info">No selection read yet</span>
+    <button id="refresh-selection-btn">Refresh selection</button>
+  </div>
+  <div id="reply-pane"></div>
+  <div id="pending-attachments"></div>
+  <div id="input-bar">
+    <button id="attach-btn" type="button" title="Attach file">📎</button>
+    <input
+      id="file-input"
+      type="file"
+      multiple
+      hidden
+      accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,.csv,.xlsx"
+    />
+    <input id="chat-input" type="text" placeholder="Ask about the selected range…" disabled />
+  </div>
+</body>
+</html>

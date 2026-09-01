@@ -1,0 +1,103 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #1e1e1e;
+  color: #e8e8e8;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+#file-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #262626;
+  border-bottom: 1px solid #333;
+}
+
+#recent-files {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  overflow-x: auto;
+}
+
+.recent-chip {
+  padding: 4px 10px;
+  background: #333;
+  border-radius: 12px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.recent-chip.active {
+  background: #148c82;
+}
+
+#browse-btn {
+  padding: 4px 10px;
+  border: none;
+  border-radius: 6px;
+  background: #444;
+  color: #e8e8e8;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+#active-file {
+  font-size: 11px;
+  color: #999;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#reply-pane {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.turn {
+  white-space: pre-wrap;
+  padding: 6px 10px;
+  border-radius: 8px;
+  max-width: 90%;
+}
+
+.turn-user {
+  align-self: flex-end;
+  background: #148c82;
+  color: #fff;
+}
+
+.turn-assistant {
+  align-self: flex-start;
+  background: #2d2d2d;
+}
+
+#chat-input {
+  border: none;
+  border-top: 1px solid #333;
+  background: #262626;
+  color: #e8e8e8;
+  padding: 12px;
+  font-size: 14px;
+  outline: none;
+}

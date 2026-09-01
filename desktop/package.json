@@ -1,0 +1,16 @@
+{
+  "name": "excel-ai-agent-desktop",
+  "version": "0.1.0",
+  "description": "Global-hotkey popup UI for the Excel AI Agent",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev"
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0"
+  }
+}

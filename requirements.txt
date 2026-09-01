@@ -2,3 +2,5 @@ anthropic
 openpyxl
 pandas
 python-dotenv
+fastapi
+uvicorn
