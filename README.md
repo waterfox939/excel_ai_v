@@ -1,7 +1,48 @@
 # Excel AI Agent
 
-A CLI agent that automates Excel workflows (order records, shipping, UPS invoices,
-payment summaries) using the Anthropic API.
+An AI assistant (powered by Claude, Anthropic's API) that works alongside you
+inside Excel — not a chatbot you upload files to. It lives in a task pane
+next to your spreadsheet, sees whatever you've selected, and can read or
+write data on **any sheet in the workbook**, live, while you're working.
+Originally built around order records, shipping, UPS invoices, and payment
+summaries, but general-purpose for any Excel workflow.
+
+You can also just talk to it from a terminal (the original CLI), or from a
+floating popup window (an earlier, now-secondary interface) — see below.
+
+## How it runs on your device
+
+Everything runs **locally on your own machine** — there's no cloud service,
+no shared server, and nothing of yours is uploaded anywhere except the
+messages you send to Anthropic's Claude API directly (using your own API
+key, billed to your own account).
+
+Concretely, two things run side by side on your computer:
+
+1. **A small local backend** (Python) that talks to the Claude API on your
+   behalf. It runs on `localhost` and is never reachable from outside your
+   machine.
+2. **A frontend** that you actually interact with — the Excel task pane,
+   the CLI, or the popup window — which talks to that local backend over
+   `localhost`.
+
+Your spreadsheet data, your questions, and any files/images you attach are
+sent only to Anthropic's API (to generate a response) and never touch any
+server operated by this project.
+
+## Supported devices
+
+| Interface | Platform | Requirements |
+|---|---|---|
+| **Excel Add-in** (primary) | macOS (packaged standalone install); dev setup also works cross-platform | Excel desktop, Node.js (dev setup only) |
+| **CLI** | macOS / Windows / Linux | Python 3 |
+| **Desktop popup** (secondary) | macOS (built/tested here); Electron itself is cross-platform | Node.js |
+
+The **standalone packaged install** (see "Standalone install" below — the
+easiest way to run this without setting up a dev environment) currently
+only has a build for **macOS**. Windows/Linux packaging hasn't been built
+yet, though nothing about the underlying design is Mac-specific — see
+Project status.
 
 ## Setup
 
