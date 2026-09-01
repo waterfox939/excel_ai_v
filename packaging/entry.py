@@ -6,8 +6,10 @@ local, no-cloud install — each step is idempotent, so re-running it (e.g.
 after an update) is safe.
 """
 import getpass
+import platform
 import shutil
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 # Must run before importing server.py / config.py, since those resolve
@@ -44,15 +46,63 @@ def prompt_for_api_key_if_missing() -> None:
     # re-import agent.py's client after this so it picks up the new key.
 
 
-def sideload_manifest() -> None:
-    manifest_src = base_dir() / "addin" / "manifest.prod.xml"
+def _sideload_macos(manifest_src: Path) -> None:
     wef_dir = Path.home() / "Library" / "Containers" / "com.microsoft.Excel" / "Data" / "Documents" / "wef"
-    if not manifest_src.exists():
-        print(f"Warning: {manifest_src} not found, skipping sideload.")
-        return
     wef_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(manifest_src, wef_dir / "manifest.xml")
     print(f"Sideloaded manifest to {wef_dir}")
+
+
+def _manifest_id(manifest_src: Path) -> str:
+    ns = "{http://schemas.microsoft.com/office/appforoffice/1.1}"
+    root = ET.parse(manifest_src).getroot()
+    id_el = root.find(f"{ns}Id")
+    if id_el is None or not id_el.text:
+        raise ValueError(f"Could not find <Id> in {manifest_src}")
+    return id_el.text.strip()
+
+
+def _sideload_windows(manifest_src: Path) -> None:
+    # Registers the add-in under HKCU\...\WEF\Developer, keyed by the
+    # manifest's <Id> GUID with the local file path as the value. This is
+    # the mechanism Microsoft's own `npm start` sideload flow uses
+    # internally (confirmed from office-addin-dev-settings' source) —
+    # closer to macOS's "just drop a file" experience than the officially
+    # documented shared-network-folder catalog, which requires an actual
+    # network share and a manual Insert > My Add-ins step every time.
+    # This key is NOT a publicly documented/guaranteed-stable contract
+    # (unlike the TrustedCatalogs registry format), so if Excel ever stops
+    # picking this up, the shared-folder-catalog route is the documented
+    # fallback — see Microsoft's "network shared folder catalog" docs.
+    import winreg
+
+    addin_id = _manifest_id(manifest_src)
+    # Persistent copy — don't point the registry at a path that could move
+    # (e.g. a temp extraction dir).
+    dest_dir = Path.home() / "AppData" / "Local" / "ExcelAIAgent"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / "manifest.xml"
+    shutil.copy2(manifest_src, dest)
+
+    key_path = r"SOFTWARE\Microsoft\Office\16.0\Wef\Developer"
+    key = winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, key_path)
+    winreg.SetValueEx(key, addin_id, 0, winreg.REG_SZ, str(dest))
+    winreg.CloseKey(key)
+    print(f"Sideloaded manifest to {dest} (registered in HKCU\\{key_path})")
+
+
+def sideload_manifest() -> None:
+    manifest_src = base_dir() / "addin" / "manifest.prod.xml"
+    if not manifest_src.exists():
+        print(f"Warning: {manifest_src} not found, skipping sideload.")
+        return
+    system = platform.system()
+    if system == "Darwin":
+        _sideload_macos(manifest_src)
+    elif system == "Windows":
+        _sideload_windows(manifest_src)
+    else:
+        print(f"Automatic sideload not implemented for {system} — see README for the manual steps.")
 
 
 def main() -> None:

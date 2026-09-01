@@ -4,3 +4,4 @@ pandas
 python-dotenv
 fastapi
 uvicorn
+cryptography; sys_platform == "win32"

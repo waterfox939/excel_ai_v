@@ -34,15 +34,17 @@ server operated by this project.
 
 | Interface | Platform | Requirements |
 |---|---|---|
-| **Excel Add-in** (primary) | macOS (packaged standalone install); dev setup also works cross-platform | Excel desktop, Node.js (dev setup only) |
+| **Excel Add-in** (primary) | macOS + Windows (packaged standalone install); dev setup also works cross-platform | Excel desktop, Node.js (dev setup only) |
 | **CLI** | macOS / Windows / Linux | Python 3 |
 | **Desktop popup** (secondary) | macOS (built/tested here); Electron itself is cross-platform | Node.js |
 
 The **standalone packaged install** (see "Standalone install" below — the
-easiest way to run this without setting up a dev environment) currently
-only has a build for **macOS**. Windows/Linux packaging hasn't been built
-yet, though nothing about the underlying design is Mac-specific — see
-Project status.
+easiest way to run this without setting up a dev environment) has builds
+for **macOS and Windows**. Each must be built *on* that OS — PyInstaller
+doesn't cross-compile, so a Windows `.exe` has to be produced by running
+`packaging/build.py` on an actual Windows machine (this has not yet been
+done/verified firsthand — see the Windows section below for confidence
+caveats). Linux packaging hasn't been built.
 
 ## Setup
 
@@ -142,6 +144,50 @@ dev setup above.
 Re-running `./excel-ai-agent` later (e.g. after rebuilding a new version)
 reuses the saved cert and API key — you won't be asked again.
 
+### Windows
+
+Same flow as macOS above, with a few Windows-specific notes:
+
+**Build it** (from a Windows machine with this repo + Node + the Python venv
+— building must happen *on* Windows, PyInstaller can't cross-compile from
+a Mac):
+
+```powershell
+.venv\Scripts\activate
+python packaging\build.py
+```
+
+This produces `packaging\dist\excel-ai-agent\excel-ai-agent.exe`. Copy the
+whole `excel-ai-agent` folder to wherever you want to run it.
+
+**Run it** (`excel-ai-agent.exe`, first time on a given machine): same
+order as Mac — HTTPS cert setup, API key prompt, manifest sideload, then
+the server starts and the console window stays open. A few differences
+under the hood worth knowing about:
+
+- The HTTPS cert is generated with the `cryptography` Python package
+  (installed automatically as part of `requirements.txt` on Windows) and
+  trusted into your **personal** certificate store via
+  `certutil -user -addstore Root` — no admin elevation needed. This may
+  show a one-time confirmation dialog the first time; that's expected,
+  not a bug.
+- The add-in is sideloaded via the registry
+  (`HKEY_CURRENT_USER\Software\Microsoft\Office\16.0\Wef\Developer`)
+  rather than copying a file into a folder like on Mac — this is the same
+  mechanism Microsoft's own add-in dev tooling uses internally, though
+  it's not a publicly documented/guaranteed-stable API. If a future
+  Excel/Office update stops picking it up, the documented fallback is a
+  [network shared folder catalog](https://learn.microsoft.com/en-us/office/dev/add-ins/testing/create-a-network-shared-folder-catalog-for-task-pane-and-content-add-ins),
+  which needs a manual **Insert > My Add-ins** step instead of it just
+  appearing.
+
+**Confidence note:** this Windows support was written and reviewed
+carefully, but has not yet been built or run on an actual Windows machine
+(this project has been developed on a Mac, which can't produce or test a
+`.exe`). If something doesn't work on first try, the most likely spots are
+the two bullets above — please report back what you see so this can be
+fixed.
+
 ## Desktop popup UI (deprioritized)
 
 An earlier attempt: press `Cmd/Ctrl+Shift+E` from anywhere for a floating
@@ -162,7 +208,7 @@ file-based workflows, not the Add-in) complete. Two frontends exist on top
 of the same Python backend: the Excel Add-in (`addin/`, primary — now with
 live multi-sheet read/write tool-calling and file/image attachments) and
 the earlier Electron popup (`desktop/`, deprioritized). The Add-in can also
-be built into a standalone local install (`packaging/`, Mac only for now —
-see above) so it can run on another machine without a dev setup. Decimal
-reconciliation and cycle templates are still ahead. See the project plan
-for details.
+be built into a standalone local install (`packaging/`, macOS and Windows
+— see above; Windows build not yet verified firsthand, see caveats) so it
+can run on another machine without a dev setup. Decimal reconciliation and
+cycle templates are still ahead. See the project plan for details.

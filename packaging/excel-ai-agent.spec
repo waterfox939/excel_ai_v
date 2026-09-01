@@ -1,4 +1,9 @@
 # -*- mode: python ; coding: utf-8 -*-
+# Cross-platform as written — PyInstaller auto-appends .exe on Windows, and
+# os.path.join handles separators correctly on either OS. Must be BUILT on
+# the target OS though (PyInstaller doesn't cross-compile): run this on a
+# real Windows machine to get a Windows .exe, this Mac can only produce a
+# macOS build.
 import os
 
 import certifi
