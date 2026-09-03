@@ -1,154 +1,519 @@
+/* Excel AI Agent — task pane styles.
+ *
+ * Hand-written, no framework and no build step: this file is served straight
+ * from source (see server.py), so there is no bundler to run a preprocessor.
+ * Sized for a task pane, which is narrow (~320-450px) and lives immediately
+ * next to the worksheet — hence the tight spacing and the light/dark
+ * switch, so it doesn't glare beside a white grid or a dark one.
+ */
+
+:root {
+  --bg: #ffffff;
+  --surface: #f7f7f5;
+  --surface-raised: #ffffff;
+  --border: #e5e3de;
+  --border-strong: #d3d0c9;
+  --text: #1f1e1d;
+  --text-muted: #6b6a67;
+  --text-faint: #97948e;
+  --accent: #c96442;
+  --accent-hover: #b0563a;
+  --accent-contrast: #ffffff;
+  --user-bubble: #f0efeb;
+  --code-bg: #f2f1ee;
+  --added: #1a7f52;
+  --added-bg: #e7f5ee;
+  --removed: #b3412f;
+  --removed-bg: #fbecea;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1a1a19;
+    --surface: #232322;
+    --surface-raised: #2a2a28;
+    --border: #373734;
+    --border-strong: #4a4a46;
+    --text: #eeeeec;
+    --text-muted: #a3a09b;
+    --text-faint: #7b7873;
+    --accent: #d97757;
+    --accent-hover: #e08a6d;
+    --accent-contrast: #1a1a19;
+    --user-bubble: #2f2f2c;
+    --code-bg: #2a2a28;
+    --added: #4ade80;
+    --added-bg: #16281f;
+    --removed: #f87171;
+    --removed-bg: #2a1a1a;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-html, body {
+html,
+body {
   height: 100%;
 }
 
 body {
   display: flex;
   flex-direction: column;
-  background: #1e1e1e;
-  color: #e8e8e8;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
 }
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* ---------- Top bar ---------- */
+
+#topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  flex-shrink: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+}
+
+.brand-mark {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.icon-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 5px 7px;
+  font-size: 13px;
+  line-height: 1;
+  transition: background 0.12s, color 0.12s;
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: var(--surface);
+  color: var(--text);
+}
+
+/* ---------- Selection bar ---------- */
 
 #selection-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
-  padding: 10px 12px;
-  background: #262626;
-  border-bottom: 1px solid #333;
-  font-size: 12px;
+  padding: 7px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 11.5px;
+  color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 #selection-info {
-  color: #999;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+#selection-info strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ---------- Transcript ---------- */
+
+#reply-pane {
+  flex: 1;
+  padding: 14px 12px 18px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  scroll-behavior: smooth;
+}
+
+.turn-user {
+  align-self: flex-end;
+  max-width: 88%;
+  padding: 7px 11px;
+  border-radius: 12px 12px 3px 12px;
+  background: var(--user-bubble);
+  color: var(--text);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.turn-assistant {
+  align-self: stretch;
+  color: var(--text);
+  word-wrap: break-word;
+}
+
+/* Blinking caret while a reply streams in. */
+.turn-assistant.streaming::after {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 14px;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--accent);
+  animation: blink 1s step-start infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* ---------- Markdown inside assistant turns ---------- */
+
+.turn-assistant p {
+  margin: 0 0 8px;
+}
+
+.turn-assistant > *:last-child {
+  margin-bottom: 0;
+}
+
+.turn-assistant h1,
+.turn-assistant h2,
+.turn-assistant h3 {
+  font-size: 13.5px;
+  font-weight: 650;
+  margin: 12px 0 6px;
+  letter-spacing: -0.01em;
+}
+
+.turn-assistant ul,
+.turn-assistant ol {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+
+.turn-assistant li {
+  margin-bottom: 3px;
+}
+
+.turn-assistant code {
+  background: var(--code-bg);
+  border-radius: 4px;
+  padding: 1.5px 5px;
+  font-family: "Cascadia Mono", Consolas, "SF Mono", monospace;
+  font-size: 11.5px;
+  color: var(--accent);
+  word-break: break-word;
+}
+
+.turn-assistant pre {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 11px;
+  margin: 0 0 8px;
+  overflow-x: auto;
+}
+
+.turn-assistant pre code {
+  background: none;
+  padding: 0;
+  color: var(--text);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.turn-assistant a {
+  color: var(--accent);
+}
+
+.turn-assistant strong {
+  font-weight: 650;
+}
+
+/* ---------- Tool activity ---------- */
+
+.activity-line {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  padding: 1px 0;
+  max-width: 100%;
+}
+
+.activity-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  flex-shrink: 0;
+}
+
+.activity-line.running .activity-dot {
+  background: var(--accent);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.7);
+  }
+}
+
+.activity-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-#refresh-selection-btn {
-  padding: 4px 10px;
-  border: none;
-  border-radius: 6px;
-  background: #444;
-  color: #e8e8e8;
-  cursor: pointer;
-  font-size: 12px;
-  flex-shrink: 0;
-}
+/* ---------- Write confirmation card ---------- */
 
-#reply-pane {
-  flex: 1;
-  padding: 12px;
-  overflow-y: auto;
-  font-size: 13px;
-  line-height: 1.6;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.turn {
-  white-space: pre-wrap;
-}
-
-.turn-user {
-  align-self: flex-end;
-  max-width: 90%;
-  padding: 8px 12px;
-  border-radius: 12px;
-  background: #148c82;
-  color: #fff;
-}
-
-.turn-assistant {
-  align-self: stretch;
-  max-width: 100%;
-  color: #d4d4d4;
-  padding: 2px 0;
-}
-
-.attachment-note {
-  font-size: 11px;
-  opacity: 0.85;
-  margin-top: 4px;
-}
-
-/* Tool activity line — "Reading Sheet2!A1:D10..." */
-.activity-line {
-  align-self: flex-start;
-  font-size: 11px;
-  color: #888;
-  font-style: italic;
-  padding: 2px 0;
-}
-
-/* Apply/Reject write confirmation card */
 .write-confirm-card {
   align-self: stretch;
-  background: #2d2d2d;
-  border: 1px solid #444;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
   border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
 }
 
-.write-confirm-card .write-summary {
-  margin-bottom: 8px;
-  color: #e8e8e8;
-}
-
-.write-confirm-card .write-summary code {
-  background: #1e1e1e;
-  padding: 1px 5px;
-  border-radius: 4px;
-  color: #6fd6c9;
-}
-
-.write-confirm-card .write-actions {
+.write-header {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
 }
 
-.write-confirm-card button {
+.write-header .target {
+  font-family: "Cascadia Mono", Consolas, "SF Mono", monospace;
+  font-weight: 500;
+  color: var(--accent);
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Before/after grid preview. Scrolls on its own so a wide write never
+   forces the whole task pane to scroll sideways. */
+.write-preview {
+  max-height: 190px;
+  overflow: auto;
+}
+
+.write-preview table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 11px;
+  font-family: "Cascadia Mono", Consolas, "SF Mono", monospace;
+}
+
+.write-preview th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  color: var(--text-faint);
+  font-weight: 500;
+  text-align: left;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.write-preview td {
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.write-preview .cell-ref {
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.write-preview .cell-old {
+  color: var(--removed);
+  background: var(--removed-bg);
+}
+
+.write-preview .cell-new {
+  color: var(--added);
+  background: var(--added-bg);
+}
+
+.write-preview .unchanged {
+  color: var(--text-faint);
+  background: none;
+}
+
+.write-more {
+  padding: 5px 11px;
+  font-size: 11px;
+  color: var(--text-faint);
+  border-bottom: 1px solid var(--border);
+}
+
+.write-actions {
+  display: flex;
+  gap: 7px;
+  padding: 9px 11px;
+}
+
+.write-actions button {
   flex: 1;
   padding: 6px 0;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: 7px;
   font-size: 12px;
+  font-weight: 550;
+  transition: background 0.12s;
 }
 
-.write-confirm-card .apply-btn {
-  background: #148c82;
-  color: #fff;
+.apply-btn {
+  background: var(--accent);
+  color: var(--accent-contrast);
 }
 
-.write-confirm-card .reject-btn {
-  background: #444;
-  color: #e8e8e8;
+.apply-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
 }
 
-.write-confirm-card .write-result {
-  margin-top: 8px;
-  color: #999;
-  font-style: italic;
+.reject-btn {
+  background: var(--surface);
+  border-color: var(--border-strong);
+  color: var(--text-muted);
 }
 
-/* Attachment chip row */
+.reject-btn:hover:not(:disabled) {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.write-result {
+  padding: 8px 11px;
+  font-size: 11.5px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.write-result.ok {
+  color: var(--added);
+}
+
+.write-result.err {
+  color: var(--removed);
+}
+
+/* ---------- Empty state ---------- */
+
+#empty-state {
+  margin: auto 0;
+  text-align: center;
+  color: var(--text-muted);
+  padding: 20px 8px;
+}
+
+#empty-state h2 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 5px;
+}
+
+#empty-state p {
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+
+.suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.suggestion {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 11px;
+  font-size: 12px;
+  text-align: left;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.suggestion:hover {
+  border-color: var(--accent);
+  background: var(--surface-raised);
+}
+
+/* ---------- Attachments ---------- */
+
 #pending-attachments {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  padding: 0 12px;
+  gap: 5px;
+  padding: 8px 12px 0;
+  flex-shrink: 0;
 }
 
 #pending-attachments:empty {
@@ -159,41 +524,153 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: #333;
-  border-radius: 12px;
-  padding: 4px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 3px 5px 3px 10px;
   font-size: 11px;
+  max-width: 100%;
+}
+
+.attachment-chip .chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 150px;
 }
 
 .attachment-chip .remove-btn {
-  cursor: pointer;
-  color: #999;
-  font-weight: bold;
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 50%;
 }
+
+.attachment-chip .remove-btn:hover {
+  color: var(--text);
+  background: var(--border);
+}
+
+/* ---------- Composer ---------- */
 
 #input-bar {
   display: flex;
-  align-items: center;
-  border-top: 1px solid #333;
-  background: #262626;
-}
-
-#attach-btn {
-  border: none;
-  background: transparent;
-  color: #999;
-  font-size: 16px;
-  padding: 12px;
-  cursor: pointer;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
   flex-shrink: 0;
 }
 
 #chat-input {
   flex: 1;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  resize: none;
+  outline: none;
+  max-height: 132px;
+  overflow-y: auto;
+  transition: border-color 0.12s;
+}
+
+#chat-input:focus {
+  border-color: var(--accent);
+}
+
+#chat-input::placeholder {
+  color: var(--text-faint);
+}
+
+#send-btn {
+  border: none;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  width: 30px;
+  height: 30px;
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  transition: background 0.12s;
+}
+
+#send-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+#send-btn.stop {
+  background: var(--text-muted);
+}
+
+#attach-btn {
   border: none;
   background: transparent;
-  color: #e8e8e8;
-  padding: 12px 12px 12px 0;
-  font-size: 14px;
-  outline: none;
+  color: var(--text-muted);
+  font-size: 15px;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+}
+
+#attach-btn:hover:not(:disabled) {
+  background: var(--surface);
+  color: var(--text);
+}
+
+/* ---------- Errors ---------- */
+
+.error-line {
+  align-self: stretch;
+  background: var(--removed-bg);
+  border: 1px solid var(--removed);
+  color: var(--removed);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 11.5px;
+}
+
+/* ---------- Scrollbars ---------- */
+
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 5px;
+  border: 2px solid var(--bg);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+}
+
+/* Attachment names shown inside a sent user turn. */
+.attachment-note {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

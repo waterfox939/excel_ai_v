@@ -1,11 +1,12 @@
 """Local HTTP backend for the Excel Add-in task pane. Thin wrapper around agent.py's client."""
 import base64
+import csv
 import io
 import json
 import sys
 from pathlib import Path
 
-import pandas as pd
+import openpyxl
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -20,7 +21,10 @@ PORT = 8765
 # `datas` — for --onedir that's an _internal/ folder next to the exe, not
 # the exe's own directory (matches packaging/entry.py's base_dir()).
 _BASE_DIR = Path(sys._MEIPASS) if getattr(sys, "frozen", False) else Path(__file__).parent
-DIST_DIR = _BASE_DIR / "addin" / "dist"
+# Served straight from source — there is no frontend build step. taskpane.js
+# is plain browser JS with no imports, so nothing needs bundling.
+TASKPANE_DIR = _BASE_DIR / "addin" / "src" / "taskpane"
+ASSETS_DIR = _BASE_DIR / "addin" / "assets"
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"])
@@ -94,6 +98,30 @@ class ChatRequest(BaseModel):
     attachments: list[Attachment] | None = None
 
 
+def _xlsx_to_csv(raw: bytes) -> str:
+    """Render the first sheet of an .xlsx attachment as CSV text for Claude.
+
+    Uses openpyxl directly rather than pandas — pandas was a ~50MB
+    dependency pulled in for this single call, and it dominated the size of
+    the packaged Windows/macOS download. read_only streams rather than
+    building the whole sheet in memory; data_only yields the cached results
+    of formulas instead of the formula source.
+    """
+    workbook = openpyxl.load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
+    try:
+        sheet = workbook.worksheets[0]
+        out = io.StringIO()
+        writer = csv.writer(out, lineterminator="\n")
+        # Row 0 is the header, so MAX_XLSX_ROWS data rows means +1 total.
+        for i, row in enumerate(sheet.iter_rows(values_only=True)):
+            if i > MAX_XLSX_ROWS:
+                break
+            writer.writerow(["" if value is None else value for value in row])
+        return out.getvalue()
+    finally:
+        workbook.close()
+
+
 def _build_content_blocks(text: str, attachments: list[Attachment] | None) -> str | list[dict]:
     """Assemble a user message's content, folding in any attachments.
 
@@ -126,8 +154,7 @@ def _build_content_blocks(text: str, attachments: list[Attachment] | None) -> st
             blocks.append({"type": "text", "text": f"[Attached file: {att.name}]\n{raw.decode('utf-8', errors='replace')}"})
         elif att.name.lower().endswith(".xlsx"):
             try:
-                df = pd.read_excel(io.BytesIO(raw), sheet_name=0)
-                csv_text = df.head(MAX_XLSX_ROWS).to_csv(index=False)
+                csv_text = _xlsx_to_csv(raw)
                 blocks.append({"type": "text", "text": f"[Attached file: {att.name}, sheet 1]\n{csv_text}"})
             except Exception as exc:
                 blocks.append({"type": "text", "text": f"[Attachment {att.name}: could not parse xlsx ({exc}), skipped]"})
@@ -204,13 +231,18 @@ def chat(request: ChatRequest) -> StreamingResponse:
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
-# Serve the built Add-in frontend (addin/dist/, produced by `npm run build`)
-# if it exists. Must be registered AFTER all /api/* routes above — Starlette
-# matches routes in registration order, and this is a catch-all mount that
-# would otherwise shadow them. In dev, addin/dist/ is served by webpack's
-# own dev server instead, so this mount is a no-op (dir doesn't exist yet).
-if DIST_DIR.is_dir():
-    app.mount("/", StaticFiles(directory=str(DIST_DIR), html=True), name="static")
+# Serve the Add-in frontend. Must be registered AFTER all /api/* routes
+# above — Starlette matches routes in registration order, and "/" below is a
+# catch-all mount that would otherwise shadow them. Likewise /assets must
+# precede "/", since the icons live outside the taskpane directory.
+#
+# This is the whole frontend "build": there is no bundler and no dev server.
+# Dev and packaged runs serve the identical files from the identical URL
+# (https://localhost:8765), which is why one manifest.xml covers both.
+if ASSETS_DIR.is_dir():
+    app.mount("/assets", StaticFiles(directory=str(ASSETS_DIR)), name="assets")
+if TASKPANE_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=str(TASKPANE_DIR), html=True), name="taskpane")
 
 
 if __name__ == "__main__":

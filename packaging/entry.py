@@ -6,6 +6,7 @@ local, no-cloud install — each step is idempotent, so re-running it (e.g.
 after an update) is safe.
 """
 import getpass
+import os
 import platform
 import shutil
 import sys
@@ -78,8 +79,12 @@ def _sideload_windows(manifest_src: Path) -> None:
 
     addin_id = _manifest_id(manifest_src)
     # Persistent copy — don't point the registry at a path that could move
-    # (e.g. a temp extraction dir).
-    dest_dir = Path.home() / "AppData" / "Local" / "ExcelAIAgent"
+    # (e.g. the folder the user unzipped into, or a temp extraction dir).
+    # Resolve via %LOCALAPPDATA% rather than assuming ~/AppData/Local, which
+    # is wrong wherever the folder is redirected (roaming profiles, OneDrive
+    # Known Folder Move, managed corporate machines).
+    local_app_data = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
+    dest_dir = local_app_data / "ExcelAIAgent"
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest = dest_dir / "manifest.xml"
     shutil.copy2(manifest_src, dest)
@@ -92,7 +97,7 @@ def _sideload_windows(manifest_src: Path) -> None:
 
 
 def sideload_manifest() -> None:
-    manifest_src = base_dir() / "addin" / "manifest.prod.xml"
+    manifest_src = base_dir() / "addin" / "manifest.xml"
     if not manifest_src.exists():
         print(f"Warning: {manifest_src} not found, skipping sideload.")
         return
@@ -106,6 +111,12 @@ def sideload_manifest() -> None:
 
 
 def main() -> None:
+    # Line-buffer stdout. PyInstaller block-buffers it whenever it is not a
+    # real console (piped, redirected to a log file), which would hide the
+    # first-run progress messages — including the warning that a cert dialog
+    # is about to appear — until the process exits.
+    sys.stdout.reconfigure(line_buffering=True)
+
     from cert_setup import ensure_cert
 
     print("Setting up HTTPS certificate...")
@@ -120,7 +131,8 @@ def main() -> None:
     from server import PORT, app
 
     ssl_kwargs = {"ssl_keyfile": str(cert.key_path), "ssl_certfile": str(cert.cert_path)} if cert else {}
-    print(f"Starting server on https://localhost:{PORT} — leave this window open while using the Add-in.")
+    scheme = "https" if cert else "http"
+    print(f"Starting server on {scheme}://localhost:{PORT} — leave this window open while using the Add-in.")
     uvicorn.run(app, host="127.0.0.1", port=PORT, **ssl_kwargs)
 
 

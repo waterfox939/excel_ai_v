@@ -1,0 +1,11 @@
+# Extra packages needed only to PRODUCE a release bundle, not to run the app.
+# End users never install these — they download the built result instead.
+# Used by .github/workflows/release.yml alongside requirements.txt.
+-r requirements.txt
+
+pyinstaller
+
+# The build also needs the local HTTPS cert generator available on every
+# platform that builds, since PyInstaller must trace cert_setup's imports.
+# (At runtime it is Windows-only — see requirements.txt.)
+cryptography

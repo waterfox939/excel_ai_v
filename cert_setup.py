@@ -14,10 +14,10 @@ from a prebuilt wheel on Windows — unlike some macOS dev setups, no Rust
 toolchain needed there) since PowerShell's New-SelfSignedCertificate can't
 cleanly export a plain-PEM private key without real pain. Trusted via
 `certutil -user -addstore Root`, targeting CurrentUser so no admin
-elevation is needed — reported silent by several deployment/sysadmin
-sources, but NOT verified firsthand on a real Windows machine. If it turns
-out to show a one-time confirmation dialog in practice, that's expected
-and acceptable (same posture as a password prompt), not a bug to chase.
+elevation is needed. Adding to the root store shows a one-time confirmation
+dialog; that's expected (same posture as a password prompt), not a bug to
+chase — but it means the user can decline, which is why trust is verified
+independently of generation on every run. See ensure_cert().
 """
 import platform
 import subprocess
@@ -61,6 +61,17 @@ def _trust_macos(cert_path: Path) -> None:
         ],
         check=True,
     )
+
+
+def _is_trusted_macos(cert_path: Path) -> bool:
+    # verify-cert only succeeds if the chain validates, which for a
+    # self-signed cert means it's actually trusted as a root.
+    result = subprocess.run(
+        ["security", "verify-cert", "-c", str(cert_path)],
+        capture_output=True,
+        check=False,
+    )
+    return result.returncode == 0
 
 
 def _generate_windows(cert_path: Path, key_path: Path) -> None:
@@ -110,9 +121,10 @@ def _generate_windows(cert_path: Path, key_path: Path) -> None:
 
 
 def _trust_windows(cert_path: Path) -> None:
-    # -user targets CurrentUser\Root (no admin elevation). Reported silent
-    # by several sysadmin/deployment sources, but not independently
-    # verified on a real machine — see module docstring.
+    # -user targets CurrentUser\Root (no admin elevation). Windows shows a
+    # one-time "you are about to install a certificate" confirmation for
+    # root-store additions; that dialog is expected, and this call blocks
+    # until the user answers it.
     subprocess.run(
         ["certutil", "-f", "-user", "-addstore", "Root", str(cert_path)],
         check=True,
@@ -120,27 +132,77 @@ def _trust_windows(cert_path: Path) -> None:
     )
 
 
+def _thumbprint(cert_path: Path) -> str:
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes
+
+    cert = x509.load_pem_x509_certificate(cert_path.read_bytes())
+    return cert.fingerprint(hashes.SHA1()).hex().upper()
+
+
+def _is_trusted_windows(cert_path: Path) -> bool:
+    # Look the cert up by thumbprint in CurrentUser\Root. Checking before
+    # re-adding is what keeps the confirmation dialog to genuinely once —
+    # certutil -f would happily re-prompt on every launch.
+    result = subprocess.run(
+        ["certutil", "-user", "-verifystore", "Root", _thumbprint(cert_path)],
+        capture_output=True,
+        check=False,
+    )
+    return result.returncode == 0
+
+
+def _manual_trust_hint(cert_path: Path, system: str) -> str:
+    if system == "Windows":
+        return f'certutil -f -user -addstore Root "{cert_path}"'
+    return f'security add-trusted-cert -d -r trustRoot -k ~/Library/Keychains/login.keychain-db "{cert_path}"'
+
+
 def ensure_cert() -> Cert | None:
     """Ensure a trusted self-signed localhost cert exists; generate + trust it on first run.
 
-    Returns None if cert generation fails, so the caller can fall back to
-    plain HTTP rather than crash outright — HTTPS is required for the
-    Office Add-in to actually load the task pane, but a broken cert setup
-    shouldn't prevent the server from starting at all for debugging.
+    Generation and trust are checked independently on every run, and that
+    separation matters: the two steps can fail apart from each other. If the
+    user dismisses Windows' root-certificate confirmation dialog, the PEM
+    files are already on disk, so keying the trust step off "do the files
+    exist?" would mean it never ran again — leaving an untrusted cert that
+    silently breaks the task pane on every subsequent launch.
+
+    Returns None only if generation itself fails, so the caller can fall back
+    to plain HTTP rather than crash outright. A cert that exists but isn't
+    trusted is still returned (with a loud warning): HTTPS-with-a-warning is
+    closer to working than no HTTPS at all, and the message tells the user
+    exactly how to fix it.
     """
     system = platform.system()
+    if system not in ("Darwin", "Windows"):
+        print(f"Cert setup not implemented for {system}. Generate and trust a localhost cert manually to use HTTPS.")
+        return None
+
     try:
         if not (CERT_PATH.exists() and KEY_PATH.exists()):
             if system == "Darwin":
                 _generate_macos(CERT_PATH, KEY_PATH)
-                _trust_macos(CERT_PATH)
-            elif system == "Windows":
-                _generate_windows(CERT_PATH, KEY_PATH)
-                _trust_windows(CERT_PATH)
             else:
-                print(f"Cert generation not implemented for {system}. Trust it manually to use HTTPS.")
-                return None
-        return Cert(cert_path=CERT_PATH, key_path=KEY_PATH)
+                _generate_windows(CERT_PATH, KEY_PATH)
     except Exception as exc:
-        print(f"Could not set up HTTPS cert ({exc}); falling back to plain HTTP.")
+        print(f"Could not generate an HTTPS cert ({exc}); falling back to plain HTTP.")
         return None
+
+    cert = Cert(cert_path=CERT_PATH, key_path=KEY_PATH)
+    try:
+        is_trusted = _is_trusted_macos(CERT_PATH) if system == "Darwin" else _is_trusted_windows(CERT_PATH)
+        if not is_trusted:
+            print("Trusting the local HTTPS certificate (you may see a one-time confirmation prompt)...")
+            if system == "Darwin":
+                _trust_macos(CERT_PATH)
+            else:
+                _trust_windows(CERT_PATH)
+    except Exception as exc:
+        print(
+            f"\n  WARNING: could not trust the local HTTPS certificate ({exc}).\n"
+            f"  Excel will refuse to load the task pane until it is trusted.\n"
+            f"  This run will retry automatically; to do it by hand:\n"
+            f"    {_manual_trust_hint(CERT_PATH, system)}\n"
+        )
+    return cert
