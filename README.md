@@ -206,7 +206,9 @@ python main.py
 ```
 
 **There is no frontend build step and no Node.js.** `addin/src/taskpane/` is
-plain browser JavaScript with no imports, so `server.py` serves it directly.
+plain browser JavaScript with no imports, so `server.py` serves it directly. Dev
+and packaged runs serve identical files from an identical URL, which is why a
+single `addin/manifest.xml` covers both.
 
 The one exception is the task-pane test suite, which needs Node to run — it
 is never needed to build or use the app, and CI runs it on a runner that
@@ -220,8 +222,6 @@ It covers the markdown renderer (including that model output can't inject
 markup), the spreadsheet column/cell-reference arithmetic behind the write
 preview, and that the HTML, CSS, and JS still agree on IDs, classes, and
 theme variables.
-Dev and packaged runs serve identical files from an identical URL, which is
-why a single `addin/manifest.xml` covers both.
 
 To sideload the manifest by hand while developing, run the packaged entry
 point once (`python packaging/entry.py`), or place `addin/manifest.xml`
@@ -246,8 +246,9 @@ git tag v1.0.0 && git push origin v1.0.0
 `.github/workflows/release.yml` runs `packaging/build.py` on hosted Windows
 and macOS runners (PyInstaller can't cross-compile, which is the entire
 reason CI does this), smoke-tests the result, and attaches the zips to a
-GitHub Release. Pushes to `main` build without publishing, so breakage shows
-up before you tag.
+GitHub Release. A push to **any** branch runs the tests and builds both
+platforms without publishing anything, so you can confirm a build works
+before you tag it — only a `v*` tag creates a Release.
 
 To build locally instead — on the OS you're targeting:
 
@@ -284,6 +285,7 @@ a development environment. Decimal reconciliation and cycle templates are
 still ahead. See the project plan for details.
 
 **Not yet verified firsthand:** no packaged build has been run end-to-end on
-a real Windows machine yet. The first CI run on a tag is what will confirm
-it. If something breaks, the likeliest spots are the certificate trust step
+a real Windows machine yet. CI proves the build succeeds and that the task
+pane files are bundled; what it cannot exercise is the certificate trust
+prompt and the registry sideload, which only run on a real Windows desktop. If something breaks, the likeliest spots are the certificate trust step
 and the registry sideload — please open an issue with what you see.
