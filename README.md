@@ -185,6 +185,30 @@ images, PDFs, CSVs, and XLSX files.
 
 ---
 
+## Versions
+
+**v2 (current) — standalone.** Download a zip from Releases, double-click it,
+paste your API key. No Python, no Node, no build step. Windows and macOS.
+
+**v1 — developer setup only.** Preserved at the [`AI`](../../tree/AI) tag. It
+needed a cloned repo, a Python virtualenv, Node and npm, and two terminals
+running side by side (a webpack dev server plus the backend). Its standalone
+build was macOS-only in practice; the Windows path was written but had never
+been built or run.
+
+| | v1 | v2 |
+|---|---|---|
+| To install | clone, venv, `npm install` | download a zip |
+| Node.js needed | yes | no |
+| Frontend build step | webpack | none |
+| Download size | roughly 3× larger | ~47 MB |
+| Windows build | never produced | built by CI |
+| Proposed writes shown as | raw JSON | per-cell before/after diff |
+| Replies rendered as | plain text | formatted markdown |
+
+v1 is kept only so the old setup stays reachable. v2 replaces it entirely —
+there is nothing v1 does that v2 doesn't.
+
 ## Running from source (development)
 
 Only needed if you want to change the code. Requires Python 3.10+.
