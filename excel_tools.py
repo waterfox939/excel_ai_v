@@ -1,4 +1,4 @@
-"""All openpyxl/pandas read and write functions."""
+"""All openpyxl read and write functions, for the CLI's file-based workflows."""
 from pathlib import Path
 from typing import Any
 

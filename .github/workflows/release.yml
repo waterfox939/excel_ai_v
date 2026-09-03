@@ -1,0 +1,128 @@
+name: Build and Release
+
+# PyInstaller cannot cross-compile, so a Windows .exe has to be produced on
+# Windows and a macOS binary on macOS. That used to mean you needed one of
+# each machine; instead these hosted runners build both, and a tag push
+# publishes them to the Releases page as ready-to-run downloads.
+on:
+  push:
+    branches: ["**"]      # any branch: runs tests + builds, publishes nothing
+    tags: ["v*"]          # a version tag is what publishes a Release
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write         # needed by `gh release` in the publish job
+
+jobs:
+  test:
+    name: Task-pane tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Node is preinstalled on the runners and is used ONLY here. The app
+      # itself has no build step and no Node dependency — see README.
+      - run: node tests/taskpane.test.js
+
+  build:
+    name: Build (${{ matrix.label }})
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: windows-x64
+            asset: excel-ai-agent-windows-x64.zip
+          - os: macos-latest
+            label: macos-arm64
+            asset: excel-ai-agent-macos-arm64.zip
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-build.txt
+
+      - name: Smoke-test the app before packaging
+        # Importing server.py exercises every runtime import, so a broken
+        # dependency surfaces here rather than as a silent crash inside a
+        # packaged .exe. The Anthropic client refuses to construct without
+        # some key present, hence the placeholder — no request is made.
+        env:
+          ANTHROPIC_API_KEY: placeholder-not-used
+        run: python -c "import server; print('server.py imports cleanly')"
+
+      - name: Build the bundle
+        run: python packaging/build.py
+
+      - name: Verify the frontend was bundled
+        # The task pane is served from files bundled as PyInstaller `datas`.
+        # If a path in the .spec drifts, the build still succeeds and the
+        # add-in fails at runtime with a blank pane — so assert it here.
+        # bash explicitly: the Windows runner defaults to PowerShell, which
+        # has no heredoc. Git Bash ships on the Windows images.
+        shell: bash
+        run: |
+          python - <<'PY'
+          import pathlib, sys
+          root = pathlib.Path("packaging/dist/excel-ai-agent")
+          required = [
+              "addin/manifest.xml",
+              "addin/src/taskpane/taskpane.html",
+              "addin/src/taskpane/taskpane.js",
+              "addin/src/taskpane/taskpane.css",
+              "addin/assets/icon-32.png",
+          ]
+          missing = [r for r in required if not list(root.rglob(r))]
+          if missing:
+              sys.exit("Missing from bundle: " + ", ".join(missing))
+          size = sum(f.stat().st_size for f in root.rglob("*") if f.is_file())
+          print(f"Bundle OK — {size / 1_000_000:.1f} MB")
+          PY
+
+      - name: Archive (Windows)
+        if: runner.os == 'Windows'
+        # -Path without a trailing /* keeps the excel-ai-agent folder itself
+        # inside the zip, so unzipping doesn't scatter files into Downloads.
+        run: Compress-Archive -Path packaging/dist/excel-ai-agent -DestinationPath ${{ matrix.asset }}
+
+      - name: Archive (macOS)
+        if: runner.os == 'macOS'
+        run: ditto -c -k --sequesterRsrc --keepParent packaging/dist/excel-ai-agent ${{ matrix.asset }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.label }}
+          path: ${{ matrix.asset }}
+          if-no-files-found: error
+
+  publish:
+    name: Publish Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Upload the builds to the Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            artifacts/*.zip

@@ -1,16 +1,24 @@
-"""Build the standalone packaged app: production frontend + PyInstaller onedir bundle.
+"""Build the standalone packaged app: a PyInstaller onedir bundle.
 
-Run from the repo root: python3 packaging/build.py
+Run from the repo root:  python packaging/build.py
+
+There is no frontend build step. addin/src/taskpane/ is plain browser JS
+with no imports, so it is bundled and served as-is — which is why this
+project needs no Node.js, no npm, and no bundler to produce a release.
+
+PyInstaller does not cross-compile: a Windows .exe must be built on
+Windows and a macOS binary on macOS. Neither needs a developer machine —
+.github/workflows/release.yml runs this on GitHub's hosted runners for
+both platforms and attaches the results to a Release.
 
 Wraps a workaround for a real PyInstaller bug on some macOS python.org
 installs: sys._base_executable points at an empty dispatcher stub
 (python3.X with no arch suffix) instead of the real interpreter binary
 (python3.X-intel64 / -arm64), which crashes PyInstaller's dependency
-analysis. If your Python doesn't have this problem, the workaround is a
-no-op (harmless).
+analysis. On Windows, and on Pythons without this problem, it's a no-op.
 """
 import os
-import subprocess
+import platform
 import sys
 from pathlib import Path
 
@@ -29,9 +37,6 @@ def _real_base_executable() -> str | None:
 
 
 def main() -> None:
-    print("Building production frontend (npm run build)...")
-    subprocess.run(["npm", "run", "build"], cwd=REPO_ROOT / "addin", check=True)
-
     fix = _real_base_executable()
     if fix:
         print(f"Working around a stubbed sys._base_executable (using {fix})")
@@ -48,7 +53,9 @@ def main() -> None:
         "--noconfirm",
     ]
     run()
-    print(f"\nBuilt: {Path(__file__).parent / 'dist' / 'excel-ai-agent' / 'excel-ai-agent'}")
+
+    exe_name = "excel-ai-agent.exe" if platform.system() == "Windows" else "excel-ai-agent"
+    print(f"\nBuilt: {Path(__file__).parent / 'dist' / 'excel-ai-agent' / exe_name}")
 
 
 if __name__ == "__main__":

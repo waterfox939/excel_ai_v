@@ -5,17 +5,39 @@
   <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
   <title>Excel AI Agent</title>
   <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script type="text/javascript" src="taskpane.js" defer></script>
   <link rel="stylesheet" href="taskpane.css" />
 </head>
 <body>
+  <header id="topbar">
+    <div class="brand">
+      <span class="brand-mark">✳</span>
+      <span>Excel AI Agent</span>
+    </div>
+    <button id="new-chat-btn" class="icon-btn" type="button" title="Start a new conversation">New</button>
+  </header>
+
   <div id="selection-bar">
-    <span id="selection-info">No selection read yet</span>
-    <button id="refresh-selection-btn">Refresh selection</button>
+    <span id="selection-info">Reading selection…</span>
+    <button id="refresh-selection-btn" class="icon-btn" type="button" title="Re-read the selected range">↻</button>
   </div>
-  <div id="reply-pane"></div>
+
+  <div id="reply-pane">
+    <div id="empty-state">
+      <h2>Ask about your workbook</h2>
+      <p>Claude sees your selection and can read any sheet.</p>
+      <div class="suggestions">
+        <button class="suggestion" type="button">Summarise the selected range</button>
+        <button class="suggestion" type="button">What sheets are in this workbook?</button>
+        <button class="suggestion" type="button">Find duplicates in this column</button>
+      </div>
+    </div>
+  </div>
+
   <div id="pending-attachments"></div>
+
   <div id="input-bar">
-    <button id="attach-btn" type="button" title="Attach file">📎</button>
+    <button id="attach-btn" type="button" title="Attach a file">📎</button>
     <input
       id="file-input"
       type="file"
@@ -23,7 +45,13 @@
       hidden
       accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,.csv,.xlsx"
     />
-    <input id="chat-input" type="text" placeholder="Ask about the selected range…" disabled />
+    <textarea
+      id="chat-input"
+      rows="1"
+      placeholder="Ask about your spreadsheet…"
+      disabled
+    ></textarea>
+    <button id="send-btn" type="button" title="Send" disabled>↑</button>
   </div>
 </body>
 </html>

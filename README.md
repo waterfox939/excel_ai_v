@@ -1,5 +1,7 @@
 # Excel AI Agent
 
+Claude Code, but for Excel.
+
 An AI assistant (powered by Claude, Anthropic's API) that works alongside you
 inside Excel — not a chatbot you upload files to. It lives in a task pane
 next to your spreadsheet, sees whatever you've selected, and can read or
@@ -10,6 +12,118 @@ summaries, but general-purpose for any Excel workflow.
 You can also just talk to it from a terminal (the original CLI), or from a
 floating popup window (an earlier, now-secondary interface) — see below.
 
+> **Before you point this at real work, read
+> [Your data](#️-your-data--please-read-before-using-this-on-real-work).**
+> Your spreadsheet contents are sent to Anthropic'"'"'s API, and Claude can read
+> every sheet in an open workbook. Use it at your own discretion.
+
+---
+
+## Install (Windows or macOS)
+
+**You do not need to install Python, Node.js, or anything else.** Download
+one file, unzip it, double-click it.
+
+1. Go to the [**Releases page**](../../releases) and download the zip for
+   your machine:
+   - Windows → `excel-ai-agent-windows-x64.zip`
+   - macOS → `excel-ai-agent-macos-arm64.zip`
+2. **Windows only — unblock it first.** Right-click the downloaded zip →
+   **Properties** → tick **Unblock** at the bottom → OK. *Then* extract it.
+   Windows tags anything downloaded from the internet, and doing this before
+   extracting saves you from a SmartScreen warning on every file inside.
+3. Extract the zip anywhere you like (Documents is fine — but see the note
+   below about not moving it afterwards).
+4. Run it:
+   - Windows → double-click **`excel-ai-agent.exe`**
+   - macOS → open Terminal in that folder and run `./excel-ai-agent`
+5. The first run asks you to **paste your own Anthropic API key** (get one at
+   [console.anthropic.com](https://console.anthropic.com/settings/keys)).
+   Input is hidden. It's saved to `~/.excel-ai-agent/config.json`, outside
+   the app folder, and you won't be asked again.
+6. **Leave that window open.** It *is* the app — closing it stops the add-in
+   from working.
+7. Open Excel. The add-in is under **Home → Add-ins → My Add-ins → Excel AI
+   Agent**. Select some cells and start typing.
+
+That's the whole install. Everything after step 1 happens offline on your
+own machine.
+
+### What the first run does automatically
+
+- Generates a self-signed HTTPS certificate for `localhost` and trusts it for
+  **your user account only** — no admin password, no system-wide changes.
+  Office refuses to load a task pane over plain HTTP, so this is required.
+- Registers the add-in with Excel (a registry entry on Windows, a file copy
+  on macOS).
+- Starts the local server on `https://localhost:8765`.
+
+All three are idempotent — re-running after an update is safe and won't
+re-prompt.
+
+### Things that will look alarming but are normal
+
+- **"Windows protected your PC" (SmartScreen).** The `.exe` isn't code-signed
+  — signing certificates cost a few hundred dollars a year. Click **More
+  info → Run anyway**, or do the Unblock step above to avoid it entirely.
+- **A one-time certificate confirmation dialog.** Windows asks before adding
+  any certificate to your trust store. Say yes — if you decline, the task
+  pane won't load, though re-running the app will offer it again.
+- **Antivirus grumbling.** Apps bundled this way (PyInstaller) get flagged as
+  false positives fairly often.
+- **Don't move the folder after the first run.** Excel is pointed at the copy
+  of the manifest made during setup. If you do move it, just run the app once
+  more from its new home.
+
+### What "no downloads" does and doesn't mean
+
+You need no *developer tools* — no Python, no Node, no package managers, no
+build step. You do still need an internet connection while using it: the task
+pane loads Office.js from Microsoft's CDN (required for all Office add-ins),
+and the whole point is talking to Claude's API.
+
+---
+
+## ⚠️ Your data — please read before using this on real work
+
+**Use this at your own discretion, especially with sensitive or confidential
+files.** This is a personal project provided as-is, with no warranty (see
+[LICENSE](LICENSE)). You are responsible for deciding what is appropriate to
+put through it.
+
+Specifically, be aware that:
+
+- **What you send leaves your machine.** Your selected cells, anything Claude
+  reads via `read_range`, your questions, and every file you attach are sent
+  to **Anthropic's API** over the internet in order to generate a reply. They
+  do not touch any server run by this project — but "runs locally" means the
+  *app* is local, not that your data stays on your computer.
+- **Claude can see more than your selection.** The `list_sheets`,
+  `get_used_range`, and `read_range` tools let it read **any sheet in the open
+  workbook** on its own initiative, without asking first. If a workbook has a
+  tab you would not want sent to an API, don't have it open.
+- **Writes modify your real workbook.** `write_range` always asks first via an
+  Apply/Reject card, but once you click Apply it overwrites those cells
+  immediately. Your only safety net is Excel's own undo. **Back up anything
+  you can't afford to lose**, and prefer working on a copy.
+- **Your API key is stored in plain text** at `~/.excel-ai-agent/config.json`
+  (Windows: `C:\Users\<you>\.excel-ai-agent\config.json`). The app restricts
+  the file to your user account, but it is not encrypted. Anyone with access
+  to your account can read it. Revoke it from the
+  [Anthropic console](https://console.anthropic.com/settings/keys) if you
+  suspect it has leaked.
+- **Check your obligations.** If you work with regulated, client-confidential,
+  personal, or otherwise restricted data, confirm your organisation's policy
+  and Anthropic's terms before pointing this at it. Some workplaces prohibit
+  sending business data to third-party AI services entirely.
+- **AI output can be wrong.** Claude misreads spreadsheets, miscounts rows,
+  and does arithmetic incorrectly. Check anything that matters before relying
+  on it — particularly numbers it writes back into your workbook.
+
+If in doubt, try it on a dummy copy of your workbook first.
+
+---
+
 ## How it runs on your device
 
 Everything runs **locally on your own machine** — there's no cloud service,
@@ -19,9 +133,9 @@ key, billed to your own account).
 
 Concretely, two things run side by side on your computer:
 
-1. **A small local backend** (Python) that talks to the Claude API on your
-   behalf. It runs on `localhost` and is never reachable from outside your
-   machine.
+1. **A small local backend** (Python, compiled into the download) that talks
+   to the Claude API on your behalf. It binds to `127.0.0.1` and is never
+   reachable from outside your machine.
 2. **A frontend** that you actually interact with — the Excel task pane,
    the CLI, or the popup window — which talks to that local backend over
    `localhost`.
@@ -34,159 +148,113 @@ server operated by this project.
 
 | Interface | Platform | Requirements |
 |---|---|---|
-| **Excel Add-in** (primary) | macOS + Windows (packaged standalone install); dev setup also works cross-platform | Excel desktop, Node.js (dev setup only) |
-| **CLI** | macOS / Windows / Linux | Python 3 |
-| **Desktop popup** (secondary) | macOS (built/tested here); Electron itself is cross-platform | Node.js |
+| **Excel Add-in** (primary) | Windows + macOS | Excel desktop. Nothing else. |
+| **CLI** | Windows / macOS / Linux | Python 3 (run from source) |
+| **Desktop popup** (secondary) | macOS built/tested; Electron is cross-platform | Node.js (run from source) |
 
-The **standalone packaged install** (see "Standalone install" below — the
-easiest way to run this without setting up a dev environment) has builds
-for **macOS and Windows**. Each must be built *on* that OS — PyInstaller
-doesn't cross-compile, so a Windows `.exe` has to be produced by running
-`packaging/build.py` on an actual Windows machine (this has not yet been
-done/verified firsthand — see the Windows section below for confidence
-caveats). Linux packaging hasn't been built.
+Linux has no packaged build. The CLI works there from source.
 
-## Setup
+## What Claude can do in your workbook
 
-1. Create a virtual environment and install dependencies:
-
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
-   ```
-
-2. Create a `.env` file in this directory with your API key:
-
-   ```
-   ANTHROPIC_API_KEY=your_key_here
-   ```
-
-3. Run the CLI:
-
-   ```bash
-   python main.py
-   ```
-
-## Excel Add-in (primary way to use this)
-
-A task pane that runs *inside* Excel itself — no file picking, no separate
-window. It reads whatever range you currently have selected in your open
-workbook, can check and edit **any other sheet by name** (not just the
-active one), and supports attaching images/PDFs/CSV/XLSX files to a
-message. Built with Office.js.
-
-Claude can call four tools, executed live against your open workbook via
-`Excel.run` — never against a file on disk:
+Four tools, executed live against your open workbook via `Excel.run` — never
+against a file on disk:
 
 - `list_sheets`, `get_used_range`, `read_range` — run immediately, read-only.
-- `write_range` — always shows an Apply/Reject card first. Nothing is
+- `write_range` — **always** shows an Apply/Reject card first. Nothing is
   written to the workbook until you click Apply.
 
-Requires [Node.js](https://nodejs.org) (LTS) and Excel desktop installed.
+The task pane reads whatever range you currently have selected, can inspect
+**any other sheet by name** (not just the active one), and accepts attached
+images, PDFs, CSVs, and XLSX files.
+
+### In the task pane
+
+- **Every proposed write is shown as a diff first.** Before you approve
+  anything, the card lists each cell that changes with its current value
+  beside the new one, so you can see exactly what Apply will do. Cells whose
+  value wouldn't change are counted separately rather than cluttering the
+  list.
+- **Formatted replies** — headings, lists, bold, and code blocks render
+  properly instead of showing raw markdown.
+- **Stop button** to interrupt a reply mid-stream, and **New** to clear the
+  conversation.
+- **Live tool activity**, so you can see when Claude is reading a range
+  rather than staring at a blank pane.
+- **Follows your system light/dark setting**, and Shift+Enter inserts a
+  newline while Enter sends.
+
+---
+
+## Running from source (development)
+
+Only needed if you want to change the code. Requires Python 3.10+.
 
 ```bash
-# terminal 1 — Python backend
-cd excel-ai-agent
-source .venv/bin/activate
-uvicorn server:app --reload --port 8765
-
-# terminal 2 — Add-in dev server (HTTPS, proxies /api to the backend above)
-cd excel-ai-agent/addin
-npm install
-npm run dev-server
+python3 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
-First-time sideload on Mac (one-time setup so Excel knows the add-in exists):
-
-1. Finder → `Cmd+Shift+G` → go to `~/Library/Containers/com.microsoft.Excel/Data/Documents/wef` (create the folder if it isn't there).
-2. Copy `addin/manifest.xml` into it.
-3. Open Excel → any workbook → **Home tab → Add-ins → My Add-ins** → select "Excel AI Agent".
-
-The task pane opens on the right side of the window. Select some cells,
-type a message — the current selection is sent along with your message
-automatically.
-
-### Standalone install (no dev setup, own API key) — Mac only for now
-
-For running this on another machine without cloning the repo or running
-two dev servers by hand. Everything stays local — there's no shared
-backend, no hosting, and no API key of mine involved; each install uses
-its own key.
-
-**Build it once** (from a machine with this repo + Node + the Python venv):
+Create a `.env` file with `ANTHROPIC_API_KEY=your_key_here`, then:
 
 ```bash
-source .venv/bin/activate
-python3 packaging/build.py
+# The Add-in — serves the task pane and the API on https://localhost:8765
+python server.py
+
+# Or the CLI
+python main.py
 ```
 
-This produces a folder at `packaging/dist/excel-ai-agent/` — copy that
-whole folder to wherever you want to run it (including another Mac).
+**There is no frontend build step and no Node.js.** `addin/src/taskpane/` is
+plain browser JavaScript with no imports, so `server.py` serves it directly.
 
-**Run it** (first time on a given machine):
+The one exception is the task-pane test suite, which needs Node to run — it
+is never needed to build or use the app, and CI runs it on a runner that
+already has Node:
 
 ```bash
-cd packaging/dist/excel-ai-agent
-./excel-ai-agent
+node tests/taskpane.test.js
 ```
 
-On first run this will, in order: generate and trust a local HTTPS
-certificate (no admin password needed — it only touches your personal
-login keychain, not the system one), ask you to paste your own Anthropic
-API key (input is hidden, saved to `~/.excel-ai-agent/config.json`, never
-inside the app folder), and copy the manifest into Excel's `wef` folder
-automatically. Leave the terminal window open — that's the local server;
-closing it stops the Add-in from working. Open Excel afterward and the
-Add-in will be there under **Home → Add-ins → My Add-ins**, same as the
-dev setup above.
+It covers the markdown renderer (including that model output can't inject
+markup), the spreadsheet column/cell-reference arithmetic behind the write
+preview, and that the HTML, CSS, and JS still agree on IDs, classes, and
+theme variables.
+Dev and packaged runs serve identical files from an identical URL, which is
+why a single `addin/manifest.xml` covers both.
 
-Re-running `./excel-ai-agent` later (e.g. after rebuilding a new version)
-reuses the saved cert and API key — you won't be asked again.
+To sideload the manifest by hand while developing, run the packaged entry
+point once (`python packaging/entry.py`), or place `addin/manifest.xml`
+yourself:
 
-### Windows
+- **macOS** — copy it to `~/Library/Containers/com.microsoft.Excel/Data/Documents/wef`
+- **Windows** — add a string value under
+  `HKCU\Software\Microsoft\Office\16.0\Wef\Developer` whose *name* is the
+  manifest's `<Id>` GUID and whose *value* is the full path to the manifest.
 
-Same flow as macOS above, with a few Windows-specific notes:
+Then: Excel → **Home → Add-ins → My Add-ins → Excel AI Agent**.
 
-**Build it** (from a Windows machine with this repo + Node + the Python venv
-— building must happen *on* Windows, PyInstaller can't cross-compile from
-a Mac):
+### Building a release
 
-```powershell
-.venv\Scripts\activate
-python packaging\build.py
+You don't need a Windows machine. Push a tag and GitHub Actions builds both
+platforms and publishes them:
+
+```bash
+git tag v1.0.0 && git push origin v1.0.0
 ```
 
-This produces `packaging\dist\excel-ai-agent\excel-ai-agent.exe`. Copy the
-whole `excel-ai-agent` folder to wherever you want to run it.
+`.github/workflows/release.yml` runs `packaging/build.py` on hosted Windows
+and macOS runners (PyInstaller can't cross-compile, which is the entire
+reason CI does this), smoke-tests the result, and attaches the zips to a
+GitHub Release. Pushes to `main` build without publishing, so breakage shows
+up before you tag.
 
-**Run it** (`excel-ai-agent.exe`, first time on a given machine): same
-order as Mac — HTTPS cert setup, API key prompt, manifest sideload, then
-the server starts and the console window stays open. A few differences
-under the hood worth knowing about:
+To build locally instead — on the OS you're targeting:
 
-- The HTTPS cert is generated with the `cryptography` Python package
-  (installed automatically as part of `requirements.txt` on Windows) and
-  trusted into your **personal** certificate store via
-  `certutil -user -addstore Root` — no admin elevation needed. This may
-  show a one-time confirmation dialog the first time; that's expected,
-  not a bug.
-- The add-in is sideloaded via the registry
-  (`HKEY_CURRENT_USER\Software\Microsoft\Office\16.0\Wef\Developer`)
-  rather than copying a file into a folder like on Mac — this is the same
-  mechanism Microsoft's own add-in dev tooling uses internally, though
-  it's not a publicly documented/guaranteed-stable API. If a future
-  Excel/Office update stops picking it up, the documented fallback is a
-  [network shared folder catalog](https://learn.microsoft.com/en-us/office/dev/add-ins/testing/create-a-network-shared-folder-catalog-for-task-pane-and-content-add-ins),
-  which needs a manual **Insert > My Add-ins** step instead of it just
-  appearing.
-
-**Confidence note:** this Windows support was written and reviewed
-carefully, but has not yet been built or run on an actual Windows machine
-(this project has been developed on a Mac, which can't produce or test a
-`.exe`). If something doesn't work on first try, the most likely spots are
-the two bullets above — please report back what you see so this can be
-fixed.
+```bash
+pip install -r requirements-build.txt
+python packaging/build.py
+```
 
 ## Desktop popup UI (deprioritized)
 
@@ -194,6 +262,7 @@ An earlier attempt: press `Cmd/Ctrl+Shift+E` from anywhere for a floating
 popup where you pick an Excel file and chat about it. Superseded by the
 Excel Add-in above (works alongside you *in* Excel instead of a separate
 window with manual file picking), but still functional — see `desktop/`.
+This one does still need Node.js.
 
 ```bash
 cd desktop
@@ -205,10 +274,16 @@ npm run dev
 
 Phase 1 (CLI) and Phase 2 (`excel_tools.py` — used only by the CLI's
 file-based workflows, not the Add-in) complete. Two frontends exist on top
-of the same Python backend: the Excel Add-in (`addin/`, primary — now with
-live multi-sheet read/write tool-calling and file/image attachments) and
-the earlier Electron popup (`desktop/`, deprioritized). The Add-in can also
-be built into a standalone local install (`packaging/`, macOS and Windows
-— see above; Windows build not yet verified firsthand, see caveats) so it
-can run on another machine without a dev setup. Decimal reconciliation and
-cycle templates are still ahead. See the project plan for details.
+of the same Python backend: the Excel Add-in (`addin/`, primary — live
+multi-sheet read/write tool-calling and file/image attachments) and the
+earlier Electron popup (`desktop/`, deprioritized).
+
+The Add-in ships as a standalone download for Windows and macOS built by CI
+(`packaging/`, `.github/workflows/release.yml`), so anyone can run it without
+a development environment. Decimal reconciliation and cycle templates are
+still ahead. See the project plan for details.
+
+**Not yet verified firsthand:** no packaged build has been run end-to-end on
+a real Windows machine yet. The first CI run on a tag is what will confirm
+it. If something breaks, the likeliest spots are the certificate trust step
+and the registry sideload — please open an issue with what you see.

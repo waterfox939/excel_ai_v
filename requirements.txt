@@ -1,7 +1,9 @@
 anthropic
 openpyxl
-pandas
 python-dotenv
 fastapi
 uvicorn
+# Windows has no system openssl to generate the local HTTPS cert with, so
+# generate it in-process instead. Installs from a prebuilt wheel there (no
+# Rust toolchain needed, unlike some macOS setups).
 cryptography; sys_platform == "win32"
